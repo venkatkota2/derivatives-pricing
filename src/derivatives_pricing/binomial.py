@@ -10,17 +10,26 @@ from .black_scholes import Option, OptionType
 
 
 def binomial_price(option: Option, *, steps: int = 500, american: bool = False) -> float:
-    if steps <= 0:
-        raise ValueError("steps must be positive")
+    if not isinstance(steps, int) or isinstance(steps, bool) or steps <= 0:
+        raise ValueError("steps must be a positive integer")
+    if not isinstance(american, bool):
+        raise ValueError("american must be a boolean")
     if option.volatility == 0:
-        forward = option.spot * exp((option.rate - option.dividend_yield) * option.maturity)
-        payoff = max(
-            forward - option.strike
-            if option.option_type == OptionType.CALL
-            else option.strike - forward,
-            0.0,
+        exercise_times = (
+            np.linspace(0.0, option.maturity, steps + 1)
+            if american
+            else np.array([option.maturity])
         )
-        return exp(-option.rate * option.maturity) * payoff
+        deterministic_spots = option.spot * np.exp(
+            (option.rate - option.dividend_yield) * exercise_times
+        )
+        intrinsic = (
+            np.maximum(deterministic_spots - option.strike, 0.0)
+            if option.option_type == OptionType.CALL
+            else np.maximum(option.strike - deterministic_spots, 0.0)
+        )
+        values = np.exp(-option.rate * exercise_times) * intrinsic
+        return float(np.max(values))
 
     dt = option.maturity / steps
     up = exp(option.volatility * sqrt(dt))

@@ -1,5 +1,7 @@
 # derivatives-pricing
 
+[![CI](https://github.com/venkatkota2/derivatives-pricing/actions/workflows/ci.yml/badge.svg)](https://github.com/venkatkota2/derivatives-pricing/actions/workflows/ci.yml)
+
 A transparent numerical-finance reference library for derivatives and fixed-income valuation across analytical, lattice, and simulation methods.
 
 The project emphasizes reconciliation. European options can be compared across Black–Scholes, Cox–Ross–Rubinstein, and Monte Carlo implementations; bond analytics are checked against discounted cash-flow identities and pull-to-par behaviour.
@@ -43,7 +45,7 @@ print(analytical.price, lattice)
 
 ## Validation approach
 
-Tests cover put–call parity, lattice convergence, implied-volatility recovery, pair-level Monte Carlo uncertainty, coupon-versus-yield behaviour, negative-rate curves, finite-input validation, and root-solver bracketing. Edge cases fail explicitly instead of returning plausible-looking values.
+Tests cover put–call parity, lattice convergence, deterministic American early exercise, implied-volatility recovery, pair-level Monte Carlo uncertainty, coupon-versus-yield behaviour, negative-rate curves, finite-input validation, and root-solver bracketing. Edge cases fail explicitly instead of returning plausible-looking values.
 
 The central reconciliation is:
 
@@ -66,4 +68,4 @@ tests/                    numerical identities and regression tests
 
 ## Scope
 
-The models use deterministic rates and volatility and do not include calibration, dividends by schedule, credit migration, callable bonds, or market-data ingestion. The library is for education and model-development demonstrations, not investment decisions.
+The models use deterministic rates and volatility and do not include calibration, dividends by schedule, credit migration, callable bonds, or market-data ingestion. At exactly zero volatility the European price remains defined, but non-differentiable Greeks are reported as `NaN`. The library is for education and model-development demonstrations, not investment decisions.
