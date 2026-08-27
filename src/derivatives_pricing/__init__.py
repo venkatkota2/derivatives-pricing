@@ -22,4 +22,3 @@ __all__ = [
     "price_european",
     "yield_to_maturity",
 ]
-

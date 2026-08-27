@@ -15,6 +15,7 @@ class MonteCarloResult:
     price: float
     standard_error: float
     paths: int
+    effective_samples: int
 
     @property
     def confidence_interval_95(self) -> tuple[float, float]:
@@ -28,31 +29,36 @@ def _payoff(underlying: np.ndarray, option: Option) -> np.ndarray:
     return np.maximum(option.strike - underlying, 0.0)
 
 
-def _result(payoffs: np.ndarray, option: Option) -> MonteCarloResult:
-    discounted = exp(-option.rate * option.maturity) * payoffs
+def _result(pair_estimates: np.ndarray, option: Option, *, paths: int) -> MonteCarloResult:
+    """Summarize independent antithetic-pair averages.
+
+    Each pair average is one independent sampling unit. Treating the two
+    payoffs within a pair as IID would understate or overstate uncertainty.
+    """
+    discounted = exp(-option.rate * option.maturity) * pair_estimates
     return MonteCarloResult(
         price=float(np.mean(discounted)),
         standard_error=float(np.std(discounted, ddof=1) / sqrt(len(discounted))),
-        paths=int(len(discounted)),
+        paths=paths,
+        effective_samples=len(discounted),
     )
 
 
-def _normal_draws(rng: np.random.Generator, paths: int, shape: tuple[int, ...]) -> np.ndarray:
-    if paths < 2:
-        raise ValueError("paths must be at least two")
-    half = (paths + 1) // 2
-    base = rng.standard_normal((half, *shape))
-    return np.concatenate([base, -base], axis=0)[:paths]
+def _normal_pairs(rng: np.random.Generator, paths: int, shape: tuple[int, ...]) -> np.ndarray:
+    if not isinstance(paths, int) or isinstance(paths, bool) or paths < 4 or paths % 2:
+        raise ValueError("antithetic simulation requires an even path count of at least four")
+    return rng.standard_normal((paths // 2, *shape))
 
 
 def price_european(option: Option, *, paths: int = 100_000, seed: int = 7) -> MonteCarloResult:
     rng = np.random.default_rng(seed)
-    z = _normal_draws(rng, paths, ())
-    terminal = option.spot * np.exp(
-        (option.rate - option.dividend_yield - 0.5 * option.volatility**2) * option.maturity
-        + option.volatility * sqrt(option.maturity) * z
-    )
-    return _result(_payoff(terminal, option), option)
+    z = _normal_pairs(rng, paths, ())
+    drift = (option.rate - option.dividend_yield - 0.5 * option.volatility**2) * option.maturity
+    diffusion = option.volatility * sqrt(option.maturity) * z
+    terminal_positive = option.spot * np.exp(drift + diffusion)
+    terminal_negative = option.spot * np.exp(drift - diffusion)
+    pair_estimates = 0.5 * (_payoff(terminal_positive, option) + _payoff(terminal_negative, option))
+    return _result(pair_estimates, option, paths=paths)
 
 
 def price_asian(
@@ -65,12 +71,14 @@ def price_asian(
     if steps <= 0:
         raise ValueError("steps must be positive")
     rng = np.random.default_rng(seed)
-    z = _normal_draws(rng, paths, (steps,))
+    z = _normal_pairs(rng, paths, (steps,))
     dt = option.maturity / steps
-    log_returns = (
-        (option.rate - option.dividend_yield - 0.5 * option.volatility**2) * dt
-        + option.volatility * sqrt(dt) * z
+    drift = (option.rate - option.dividend_yield - 0.5 * option.volatility**2) * dt
+    diffusion = option.volatility * sqrt(dt) * z
+    prices_positive = option.spot * np.exp(np.cumsum(drift + diffusion, axis=1))
+    prices_negative = option.spot * np.exp(np.cumsum(drift - diffusion, axis=1))
+    pair_estimates = 0.5 * (
+        _payoff(np.mean(prices_positive, axis=1), option)
+        + _payoff(np.mean(prices_negative, axis=1), option)
     )
-    prices = option.spot * np.exp(np.cumsum(log_returns, axis=1))
-    return _result(_payoff(np.mean(prices, axis=1), option), option)
-
+    return _result(pair_estimates, option, paths=paths)

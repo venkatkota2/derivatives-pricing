@@ -1,4 +1,4 @@
-"""Cox–Ross–Rubinstein option lattice."""
+"""Cox-Ross-Rubinstein option lattice."""
 
 from __future__ import annotations
 
@@ -15,7 +15,9 @@ def binomial_price(option: Option, *, steps: int = 500, american: bool = False) 
     if option.volatility == 0:
         forward = option.spot * exp((option.rate - option.dividend_yield) * option.maturity)
         payoff = max(
-            forward - option.strike if option.option_type == OptionType.CALL else option.strike - forward,
+            forward - option.strike
+            if option.option_type == OptionType.CALL
+            else option.strike - forward,
             0.0,
         )
         return exp(-option.rate * option.maturity) * payoff
@@ -48,4 +50,3 @@ def binomial_price(option: Option, *, steps: int = 500, american: bool = False) 
             )
             values = np.maximum(values, intrinsic)
     return float(values[0])
-
