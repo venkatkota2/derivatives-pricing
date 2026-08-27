@@ -37,7 +37,10 @@ def main() -> None:
                 option_type=OptionType(args.type),
             )
         )
-        print(f"price={result.price:.6f} delta={result.delta:.6f} gamma={result.gamma:.6f} vega={result.vega:.6f}")
+        print(
+            f"price={result.price:.6f} delta={result.delta:.6f} "
+            f"gamma={result.gamma:.6f} vega={result.vega:.6f}"
+        )
     else:
         result = bond_analytics(
             Bond(args.face, args.coupon, args.maturity, args.frequency),
@@ -51,4 +54,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -31,7 +31,42 @@ def test_discount_curve_interpolates_log_discount_factors():
     assert curve.forward_rate(1, 2) > 0
 
 
-def test_non_monotone_discount_curve_is_rejected():
-    with pytest.raises(ValueError):
-        DiscountCurve(np.array([1.0, 2.0]), np.array([0.95, 0.97]))
+def test_negative_rate_discount_curve_is_supported():
+    curve = DiscountCurve.from_zero_rates(
+        np.array([1.0, 2.0, 5.0]),
+        np.array([-0.01, -0.008, -0.004]),
+    )
 
+    assert np.all(curve.discount_factors > 1.0)
+    assert curve.discount(2.0) == pytest.approx(np.exp(0.016))
+    assert curve.forward_rate(1.0, 2.0) < 0.0
+
+
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), float("-inf")])
+def test_curve_and_bond_reject_non_finite_inputs(invalid):
+    with pytest.raises(ValueError):
+        DiscountCurve(np.array([1.0, invalid]), np.array([0.98, 0.95]))
+    with pytest.raises(ValueError):
+        Bond(face=1_000, coupon_rate=0.04, maturity=invalid)
+    bond = Bond(face=1_000, coupon_rate=0.04, maturity=5)
+    with pytest.raises(ValueError):
+        bond_price(bond, invalid)
+    with pytest.raises(ValueError):
+        bond_analytics(bond, invalid)
+
+
+def test_bond_yield_validation_is_consistent():
+    bond = Bond(face=1_000, coupon_rate=0.04, maturity=5, frequency=2)
+    for function in (bond_price, bond_analytics):
+        with pytest.raises(ValueError, match="invalid discount factors"):
+            function(bond, -2.0)
+
+
+def test_yield_solver_requires_a_bracket_and_convergence():
+    bond = Bond(face=1_000, coupon_rate=0.04, maturity=5, frequency=2)
+    with pytest.raises(ValueError, match="cannot be bracketed"):
+        yield_to_maturity(bond, 1e-300)
+    with pytest.raises(ValueError, match="solver configuration"):
+        yield_to_maturity(bond, 1_000, tolerance=float("nan"))
+    with pytest.raises(RuntimeError, match="did not converge"):
+        yield_to_maturity(bond, 900, tolerance=1e-20, max_iterations=1)
