@@ -59,7 +59,10 @@ def bond_price(bond: Bond, yield_rate: float) -> float:
     times, amounts = bond.cashflows()
     periods = times * bond.frequency
     discounts = np.power(1.0 + periodic_yield, -periods)
-    return float(np.sum(amounts * discounts))
+    price = float(np.sum(amounts * discounts))
+    if not isfinite(price):
+        raise OverflowError("bond price is not finite for the supplied yield")
+    return price
 
 
 def yield_to_maturity(
@@ -118,4 +121,6 @@ def bond_analytics(bond: Bond, yield_rate: float) -> BondAnalytics:
         np.sum(amounts * periods * (periods + 1.0) * np.power(1.0 + periodic_yield, -periods - 2.0))
         / (price * bond.frequency**2)
     )
+    if not all(isfinite(value) for value in (price, macaulay, modified, convexity)):
+        raise OverflowError("bond analytics are not finite for the supplied yield")
     return BondAnalytics(price, macaulay, modified, convexity)

@@ -36,6 +36,8 @@ def _result(pair_estimates: np.ndarray, option: Option, *, paths: int) -> MonteC
     payoffs within a pair as IID would understate or overstate uncertainty.
     """
     discounted = exp(-option.rate * option.maturity) * pair_estimates
+    if not np.all(np.isfinite(discounted)):
+        raise OverflowError("simulation produced non-finite discounted payoffs")
     return MonteCarloResult(
         price=float(np.mean(discounted)),
         standard_error=float(np.std(discounted, ddof=1) / sqrt(len(discounted))),
@@ -68,8 +70,8 @@ def price_asian(
     steps: int = 252,
     seed: int = 7,
 ) -> MonteCarloResult:
-    if steps <= 0:
-        raise ValueError("steps must be positive")
+    if not isinstance(steps, int) or isinstance(steps, bool) or steps <= 0:
+        raise ValueError("steps must be a positive integer")
     rng = np.random.default_rng(seed)
     z = _normal_pairs(rng, paths, (steps,))
     dt = option.maturity / steps

@@ -89,6 +89,25 @@ def test_american_put_is_not_cheaper_than_european_put():
     assert american >= european
 
 
+def test_zero_volatility_american_put_recognizes_immediate_exercise():
+    put = Option(100, 120, 1, 0.10, 0.0, option_type=OptionType.PUT)
+
+    european = binomial_price(put, steps=100, american=False)
+    american = binomial_price(put, steps=100, american=True)
+
+    assert american == pytest.approx(20.0)
+    assert american > european
+
+
+@pytest.mark.parametrize("steps", [0, -1, 1.5, True])
+def test_discrete_pricers_require_positive_integer_steps(steps):
+    option = Option(100, 100, 1, 0.05, 0.20)
+    with pytest.raises(ValueError, match="positive integer"):
+        binomial_price(option, steps=steps)
+    with pytest.raises(ValueError, match="positive integer"):
+        price_asian(option, paths=20, steps=steps)
+
+
 @pytest.mark.parametrize("invalid", [float("nan"), float("inf"), float("-inf")])
 def test_option_and_solver_reject_non_finite_inputs(invalid):
     with pytest.raises(ValueError):
